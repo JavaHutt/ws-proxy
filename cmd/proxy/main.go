@@ -2,32 +2,27 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
-
-	"github.com/koding/websocketproxy"
 )
 
 var (
-	proxyAddr = flag.String("proxyAddr", "localhost:8080", "http proxy address")
-	addr      = flag.String("addr", "localhost:8081", "http service address")
+	proxyAddr   = flag.String("proxyAddr", "localhost:8080", "http proxy address")
+	backendAddr = flag.String("addr", "localhost:8081", "http service address")
 )
 
 func main() {
 	flag.Parse()
 	log.SetFlags(0)
-	u := url.URL{Scheme: "ws", Host: *addr}
-
-	proxy := websocketproxy.NewProxy(&u)
-	http.HandleFunc("/", proxyHandler(proxy))
+	http.HandleFunc("/", handlerProxy)
+	log.Printf("Proxy is waiting for connections on %s/", *proxyAddr)
 	log.Fatal(http.ListenAndServe(*proxyAddr, nil))
 }
 
-func proxyHandler(proxy *websocketproxy.WebsocketProxy) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("proxy req")
-		proxy.ServeHTTP(w, r)
-	}
+func handlerProxy(w http.ResponseWriter, r *http.Request) {
+	url := url.URL{Scheme: "http", Host: *backendAddr}
+	proxy := httputil.NewSingleHostReverseProxy(&url)
+	proxy.ServeHTTP(w, r)
 }
