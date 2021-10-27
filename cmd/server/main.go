@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	addr     = flag.String("addr", "localhost:8080", "http service address")
+	addr     = flag.String("addr", "localhost:8081", "http service address")
 	upgrader = websocket.Upgrader{}
 )
 
