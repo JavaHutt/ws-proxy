@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	proxy "test.task/backend/proxy"
@@ -22,19 +23,22 @@ type Server interface {
 
 // Server represents an HTTP server.
 type server struct {
-	addr        string
-	backendAddr string
-	serv        *http.Server
-	upgrader    websocket.Upgrader
-	dialer      *websocket.Dialer
+	sync.Mutex
+	addr             string
+	backendAddr      string
+	connectedClients map[uint32]struct{}
+	serv             *http.Server
+	upgrader         websocket.Upgrader
+	dialer           *websocket.Dialer
 }
 
 func NewServer(addr, backendAddr string) Server {
 	return &server{
-		addr:        addr,
-		backendAddr: backendAddr,
-		upgrader:    websocket.Upgrader{},
-		dialer:      websocket.DefaultDialer,
+		addr:             addr,
+		backendAddr:      backendAddr,
+		connectedClients: make(map[uint32]struct{}),
+		upgrader:         websocket.Upgrader{},
+		dialer:           websocket.DefaultDialer,
 	}
 }
 
@@ -43,7 +47,7 @@ func (s *server) Open() error {
 	s.serv = &http.Server{
 		Addr: s.addr,
 	}
-	log.Printf("Waiting for proxyions on %s/", s.addr)
+	log.Printf("Waiting for connections on %s/", s.addr)
 	http.HandleFunc("/", s.proxyHandler)
 	return s.serv.ListenAndServe()
 }
@@ -59,7 +63,7 @@ func (s *server) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s server) proxyHandler(w http.ResponseWriter, r *http.Request) {
+func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	clientWS, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade client request:", err)
@@ -73,37 +77,44 @@ func (s server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	done := make(chan struct{})
-	go s.startRecievingFromServerToClient(serverWS, clientWS, done)
-
-	go func() {
-		defer clientWS.Close()
-		for {
-			mt, message, err := clientWS.ReadMessage()
-			if err != nil {
-				break
-			}
-			req := proxy.DecodeOrderRequest(message)
-			log.Printf("recv from client: %v", req)
-
-			fmt.Println("process proxy req")
-
-			res := proxy.OrderResponse{
-				ID:   req.ID,
-				Code: 0,
-			}
-			if err = serverWS.WriteMessage(mt, message); err != nil {
-				log.Println("write to server:", err)
-				continue
-			}
-
-			log.Printf("sent: %v", res)
-		}
-	}()
+	go s.serverToClient(serverWS, clientWS, done)
+	go s.clientToServer(clientWS, serverWS)
 }
 
-func (s server) startRecievingFromServerToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
+func (s *server) clientToServer(clientWS, serverWS *websocket.Conn) {
+	defer clientWS.Close()
 	for {
-		defer serverWS.Close()
+		mt, message, err := clientWS.ReadMessage()
+		if err != nil {
+			break
+		}
+		req := proxy.DecodeOrderRequest(message)
+		log.Printf("recv from client: %v", req)
+		// TODO No idea how to store information about connected user...
+		// clientID := req.ClientID
+		// if s.checkClientIsConnected(clientID) {
+		// 	log.Printf("client %d is already connected", clientID)
+		// 	break
+		// }
+
+		fmt.Println("process proxy req")
+
+		res := proxy.OrderResponse{
+			ID:   req.ID,
+			Code: 0,
+		}
+		if err = serverWS.WriteMessage(mt, message); err != nil {
+			log.Println("write to server:", err)
+			continue
+		}
+
+		log.Printf("sent: %v", res)
+	}
+}
+
+func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
+	defer serverWS.Close()
+	for {
 		mt, messsage, err := serverWS.ReadMessage()
 		if err != nil {
 			log.Printf("recv error: %+v", err)
@@ -118,4 +129,20 @@ func (s server) startRecievingFromServerToClient(serverWS, clientWS *websocket.C
 
 		log.Printf("recv from server and sent to client: %v", decoded)
 	}
+}
+
+func (s *server) checkClientIsConnected(clientID uint32) bool {
+	if _, ok := s.connectedClients[clientID]; ok {
+		return true
+	}
+	s.Lock()
+	defer s.Unlock()
+	s.connectedClients[clientID] = struct{}{}
+	return false
+}
+
+func (s *server) disconnectClient(clientID uint32) {
+	s.Lock()
+	defer s.Unlock()
+	delete(s.connectedClients, clientID)
 }

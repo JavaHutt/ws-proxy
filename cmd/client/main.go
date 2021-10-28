@@ -67,7 +67,7 @@ func startFakingOrders(c *websocket.Conn, done chan struct{}, interrupt chan os.
 			return
 		case <-ticker.C:
 			req := proxy.OrderRequest{
-				ClientID:   clientID,
+				ClientID:   3,
 				ID:         id,
 				ReqType:    uint8(rand.Uint32()),
 				OrderKind:  uint8(rand.Uint32()),
