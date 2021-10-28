@@ -10,6 +10,11 @@ import (
 	proxy "test.task/backend/proxy"
 )
 
+var (
+	upgrader = websocket.Upgrader{}
+	dialer   = websocket.DefaultDialer
+)
+
 // WebSocketConnection is a wrapper for our websocket connection, in case
 // we ever need to put more data into the struct
 type WebSocketConnection struct {
@@ -72,13 +77,12 @@ func startRecievingFromServerToClient(serverWS, clientWS *websocket.Conn, done c
 			return
 		}
 		decoded := proxy.DecodeOrderResponse(messsage)
-		log.Printf("recv from server: %v", decoded)
 
 		if err = clientWS.WriteMessage(mt, messsage); err != nil {
 			log.Println("write to client:", err)
 			continue
 		}
 
-		log.Printf("sent to client: %v", decoded)
+		log.Printf("recv from server and sent to client: %v", decoded)
 	}
 }
