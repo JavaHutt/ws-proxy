@@ -36,14 +36,12 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		}
 		req := proxy.DecodeOrderRequest(message)
 		log.Printf("recv: %v", req)
-		_ = req
 
 		res := proxy.OrderResponse{
 			ID:   req.ID,
 			Code: 0,
 		}
-		err = c.WriteMessage(mt, proxy.EncodeOrderResponse(res))
-		if err != nil {
+		if err = c.WriteMessage(mt, proxy.EncodeOrderResponse(res)); err != nil {
 			log.Println("write:", err)
 			continue
 		}

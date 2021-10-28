@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	addr                  = flag.String("addr", "localhost:8081", "http service address")
+	addr                  = flag.String("addr", "localhost:8080", "http service address")
 	instrument            = flag.String("inst", "EURUSD", "instrument")
 	interval              = flag.Duration("inter", 2*time.Second, "interval of sending request")
 	seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -28,7 +28,7 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/connect"}
+	u := url.URL{Scheme: "ws", Host: *addr, Path: "/"}
 	log.Printf("connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
