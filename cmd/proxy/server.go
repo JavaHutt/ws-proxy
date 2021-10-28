@@ -35,7 +35,7 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	done := make(chan struct{})
-	go startRecievingFromServer(serverWS, done)
+	go startRecievingFromServerToClient(serverWS, clientWS, done)
 
 	go func() {
 		defer clientWS.Close()
@@ -53,7 +53,6 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 				ID:   req.ID,
 				Code: 0,
 			}
-			// wsChan <- struct{}{}
 			if err = serverWS.WriteMessage(mt, message); err != nil {
 				log.Println("write to server:", err)
 				continue
@@ -64,14 +63,22 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func startRecievingFromServer(c *websocket.Conn, done chan struct{}) {
+func startRecievingFromServerToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
 	for {
-		defer c.Close()
-		_, mess, err := c.ReadMessage()
+		defer serverWS.Close()
+		mt, messsage, err := serverWS.ReadMessage()
 		if err != nil {
 			log.Printf("recv error: %+v", err)
 			return
 		}
-		log.Printf("recv from server: %v", proxy.DecodeOrderResponse(mess))
+		decoded := proxy.DecodeOrderResponse(messsage)
+		log.Printf("recv from server: %v", decoded)
+
+		if err = clientWS.WriteMessage(mt, messsage); err != nil {
+			log.Println("write to client:", err)
+			continue
+		}
+
+		log.Printf("sent to client: %v", decoded)
 	}
 }
