@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	addr                  = flag.String("addr", "localhost:8080", "http service address")
+	addr                  = flag.String("addr", "localhost:8081", "http service address")
 	instrument            = flag.String("inst", "EURUSD", "instrument")
 	interval              = flag.Duration("inter", 2*time.Second, "interval of sending request")
 	seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -39,22 +39,26 @@ func main() {
 
 	done := make(chan struct{})
 
-	go func() {
-		defer close(done)
-		for {
-			_, mess, err := c.ReadMessage()
-			if err != nil {
-				log.Printf("recv error: %+v", err)
-				return
-			}
-			log.Printf("recv: %v", proxy.DecodeOrderResponse(mess))
-		}
-	}()
+	go startRecieving(c, done)
+	startFakingOrders(c, done, interrupt)
+}
 
+func startRecieving(c *websocket.Conn, done chan struct{}) {
+	defer close(done)
+	for {
+		_, mess, err := c.ReadMessage()
+		if err != nil {
+			log.Printf("recv error: %+v", err)
+			return
+		}
+		log.Printf("recv: %v", proxy.DecodeOrderResponse(mess))
+	}
+}
+
+func startFakingOrders(c *websocket.Conn, done chan struct{}, interrupt chan os.Signal) {
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
 	var id = uint32(time.Now().UTC().Unix())
-
 	for {
 		id++
 
@@ -83,8 +87,9 @@ func main() {
 
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
+			if err := c.WriteMessage(
+				websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
 				log.Println("write close:", err)
 				return
 			}

@@ -48,6 +48,6 @@ func connect(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		log.Printf("sent: %v", req)
+		log.Printf("sent: %v", res)
 	}
 }
