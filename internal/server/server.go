@@ -73,7 +73,7 @@ func (s server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	done := make(chan struct{})
-	go startRecievingFromServerToClient(serverWS, clientWS, done)
+	go s.startRecievingFromServerToClient(serverWS, clientWS, done)
 
 	go func() {
 		defer clientWS.Close()
@@ -101,7 +101,7 @@ func (s server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func startRecievingFromServerToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
+func (s server) startRecievingFromServerToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
 	for {
 		defer serverWS.Close()
 		mt, messsage, err := serverWS.ReadMessage()
