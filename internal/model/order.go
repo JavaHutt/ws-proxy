@@ -1,20 +1,20 @@
 package model
 
-type RequestType int
+type RequestType uint8
 
 const (
 	RequestTypeOpen RequestType = iota + 1
 	RequestTypeClose
 )
 
-type OrderKind int
+type OrderKind uint8
 
 const (
 	OrderKindBuy OrderKind = iota + 1
 	OrderKindSell
 )
 
-type ResultCode int
+type ResultCode uint16
 
 const (
 	ResultCodeOpenOrdersExceedes ResultCode = iota + 1
