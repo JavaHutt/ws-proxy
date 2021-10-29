@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -92,6 +91,8 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	serverWS := s.mustGetServerConn()
 	_, err = s.adapter.TranslateOrder(req)
 	if err != nil {
+		// the task description didn't specify the way to respond to invalid
+		// requests, so I've decided to send back "Other" result code
 		writeOtherErrorToClient(clientWS, req.ID, err)
 	} else {
 		// first-time write to server after establishing connection with client
@@ -116,14 +117,17 @@ func (s *server) clientToServer(clientWS, serverWS *websocket.Conn, clientID uin
 		req := proxy.DecodeOrderRequest(message)
 		log.Printf("recv from client: %v", req)
 
-		fmt.Println("process proxy req")
+		_, err = s.adapter.TranslateOrder(req)
+		if err != nil {
+			writeOtherErrorToClient(clientWS, req.ID, err)
+			continue
+		}
 
 		res := proxy.OrderResponse{
 			ID:   req.ID,
 			Code: 0,
 		}
 		if err = writeToConn(serverWS, "server", mt, message); err != nil {
-			log.Println("write to server:", err)
 			continue
 		}
 
@@ -167,7 +171,7 @@ func writeToConn(conn *websocket.Conn, connType string, mt int, message []byte) 
 }
 
 func writeOtherErrorToClient(clientWS *websocket.Conn, ID uint32, customErr error) {
-	log.Printf("error occured: %v", customErr)
+	log.Printf("error ID %d: %v", ID, customErr)
 	res := proxy.OrderResponse{
 		ID:   ID,
 		Code: uint16(model.ResultCodeOther),
