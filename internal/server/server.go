@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	proxy "test.task/backend/proxy"
+	"test.task/backend/proxy/internal/model"
 )
 
 // Server will perform operations over http.
@@ -21,21 +22,27 @@ type Server interface {
 	Close(ctx context.Context) error
 }
 
+type orderAdapter interface {
+	TranslateOrder(order proxy.OrderRequest) (model.OrderRequest, error)
+}
+
 // Server represents an HTTP server.
 type server struct {
 	sync.Mutex
 	addr             string
 	backendAddr      string
+	adapter          orderAdapter
 	connectedClients map[uint32]struct{}
 	serv             *http.Server
 	upgrader         websocket.Upgrader
 	dialer           *websocket.Dialer
 }
 
-func NewServer(addr, backendAddr string) Server {
+func NewServer(addr, backendAddr string, orderAdapter orderAdapter) Server {
 	return &server{
 		addr:             addr,
 		backendAddr:      backendAddr,
+		adapter:          orderAdapter,
 		connectedClients: make(map[uint32]struct{}),
 		upgrader:         websocket.Upgrader{},
 		dialer:           websocket.DefaultDialer,
@@ -83,9 +90,12 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverWS := s.mustGetServerConn()
-	// first-time write to server after establishing connection with client
-	if err = serverWS.WriteMessage(mt, message); err != nil {
-		log.Println("write to server:", err)
+	_, err = s.adapter.TranslateOrder(req)
+	if err != nil {
+		writeOtherErrorToClient(clientWS, req.ID, err)
+	} else {
+		// first-time write to server after establishing connection with client
+		writeToConn(serverWS, "server", mt, message)
 	}
 
 	done := make(chan struct{})
@@ -112,7 +122,7 @@ func (s *server) clientToServer(clientWS, serverWS *websocket.Conn, clientID uin
 			ID:   req.ID,
 			Code: 0,
 		}
-		if err = serverWS.WriteMessage(mt, message); err != nil {
+		if err = writeToConn(serverWS, "server", mt, message); err != nil {
 			log.Println("write to server:", err)
 			continue
 		}
@@ -131,8 +141,7 @@ func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan st
 		}
 		decoded := proxy.DecodeOrderResponse(messsage)
 
-		if err = clientWS.WriteMessage(mt, messsage); err != nil {
-			log.Println("write to client:", err)
+		if err = writeToConn(clientWS, "client", mt, messsage); err != nil {
 			continue
 		}
 
@@ -147,4 +156,21 @@ func (s *server) mustGetServerConn() *websocket.Conn {
 		log.Fatal("dial to a server:", err)
 	}
 	return serverWS
+}
+
+func writeToConn(conn *websocket.Conn, connType string, mt int, message []byte) error {
+	if err := conn.WriteMessage(mt, message); err != nil {
+		log.Printf("write to %s: %v", connType, err)
+		return err
+	}
+	return nil
+}
+
+func writeOtherErrorToClient(clientWS *websocket.Conn, ID uint32, customErr error) {
+	log.Printf("error occured: %v", customErr)
+	res := proxy.OrderResponse{
+		ID:   ID,
+		Code: uint16(model.ResultCodeOther),
+	}
+	writeToConn(clientWS, "client", websocket.TextMessage, proxy.EncodeOrderResponse(res))
 }

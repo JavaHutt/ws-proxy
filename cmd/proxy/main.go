@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"test.task/backend/proxy/internal/action"
+	"test.task/backend/proxy/internal/adapter"
 	"test.task/backend/proxy/internal/server"
 )
 
@@ -17,7 +18,8 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	server := server.NewServer(*proxyAddr, *backendAddr)
+	orderAdapter := adapter.NewOrderAdapter()
+	server := server.NewServer(*proxyAddr, *backendAddr, orderAdapter)
 	errorChannel := make(chan error)
 	doneChannel := make(chan struct{})
 
