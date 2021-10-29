@@ -70,32 +70,36 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// checking initial connection
+	filterPassed, mt, message, clientID := s.filterConnection(clientWS)
+	if !filterPassed {
+		return
+	}
+
 	u := url.URL{Scheme: "ws", Host: s.backendAddr, Path: "/connect"}
 	serverWS, _, err := s.dialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("dial to a server:", err)
 	}
+	if err = serverWS.WriteMessage(mt, message); err != nil {
+		log.Println("write to server:", err)
+	}
 
 	done := make(chan struct{})
 	go s.serverToClient(serverWS, clientWS, done)
-	go s.clientToServer(clientWS, serverWS)
+	s.clientToServer(clientWS, serverWS, clientID)
 }
 
-func (s *server) clientToServer(clientWS, serverWS *websocket.Conn) {
+func (s *server) clientToServer(clientWS, serverWS *websocket.Conn, clientID uint32) {
 	defer clientWS.Close()
 	for {
 		mt, message, err := clientWS.ReadMessage()
 		if err != nil {
+			s.disconnectClient(clientID)
 			break
 		}
 		req := proxy.DecodeOrderRequest(message)
 		log.Printf("recv from client: %v", req)
-		// TODO No idea how to store information about connected user...
-		// clientID := req.ClientID
-		// if s.checkClientIsConnected(clientID) {
-		// 	log.Printf("client %d is already connected", clientID)
-		// 	break
-		// }
 
 		fmt.Println("process proxy req")
 
@@ -108,7 +112,7 @@ func (s *server) clientToServer(clientWS, serverWS *websocket.Conn) {
 			continue
 		}
 
-		log.Printf("sent: %v", res)
+		log.Printf("sent to server: %v", res)
 	}
 }
 
@@ -131,12 +135,34 @@ func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan st
 	}
 }
 
+// filterConnection filters initiated connection and returns true if everything
+// is ok with original message type, message and clientID, otherwise returns false
+func (s *server) filterConnection(clientWS *websocket.Conn) (bool, int, []byte, uint32) {
+	mt, message, err := clientWS.ReadMessage()
+	if err != nil {
+		return false, -1, nil, 0
+	}
+	req := proxy.DecodeOrderRequest(message)
+	clientID := req.ClientID
+	if s.checkClientIsConnected(clientID) {
+		log.Printf("client %d is already connected", clientID)
+		if err := clientWS.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "client is already connected")); err != nil {
+			log.Println("write close:", err)
+			return false, -1, nil, 0
+		}
+		return false, -1, nil, 0
+	}
+	return true, mt, message, clientID
+}
+
 func (s *server) checkClientIsConnected(clientID uint32) bool {
+	s.Lock()
+	defer s.Unlock()
 	if _, ok := s.connectedClients[clientID]; ok {
 		return true
 	}
-	s.Lock()
-	defer s.Unlock()
 	s.connectedClients[clientID] = struct{}{}
 	return false
 }
