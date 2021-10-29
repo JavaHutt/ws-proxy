@@ -69,24 +69,29 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		log.Print("upgrade client request:", err)
 		return
 	}
+	mt, message, err := clientWS.ReadMessage()
+	if err != nil {
+		return
+	}
+	req := proxy.DecodeOrderRequest(message)
+	clientID := req.ClientID
 
 	// checking initial connection
-	filterPassed, mt, message, clientID := s.filterConnection(clientWS)
+	filterPassed := s.filterConnection(clientWS, clientID)
 	if !filterPassed {
 		return
 	}
 
-	u := url.URL{Scheme: "ws", Host: s.backendAddr, Path: "/connect"}
-	serverWS, _, err := s.dialer.Dial(u.String(), nil)
-	if err != nil {
-		log.Fatal("dial to a server:", err)
-	}
+	serverWS := s.mustGetServerConn()
+	// first-time write to server after establishing connection with client
 	if err = serverWS.WriteMessage(mt, message); err != nil {
 		log.Println("write to server:", err)
 	}
 
 	done := make(chan struct{})
+	// start listening from server and repeat message directly to client
 	go s.serverToClient(serverWS, clientWS, done)
+	// process client message and pass it to server if everything is ok
 	s.clientToServer(clientWS, serverWS, clientID)
 }
 
@@ -135,40 +140,11 @@ func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan st
 	}
 }
 
-// filterConnection filters initiated connection and returns true if everything
-// is ok with original message type, message and clientID, otherwise returns false
-func (s *server) filterConnection(clientWS *websocket.Conn) (bool, int, []byte, uint32) {
-	mt, message, err := clientWS.ReadMessage()
+func (s *server) mustGetServerConn() *websocket.Conn {
+	u := url.URL{Scheme: "ws", Host: s.backendAddr, Path: "/connect"}
+	serverWS, _, err := s.dialer.Dial(u.String(), nil)
 	if err != nil {
-		return false, -1, nil, 0
+		log.Fatal("dial to a server:", err)
 	}
-	req := proxy.DecodeOrderRequest(message)
-	clientID := req.ClientID
-	if s.checkClientIsConnected(clientID) {
-		log.Printf("client %d is already connected", clientID)
-		if err := clientWS.WriteMessage(
-			websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.CloseNormalClosure, "client is already connected")); err != nil {
-			log.Println("write close:", err)
-			return false, -1, nil, 0
-		}
-		return false, -1, nil, 0
-	}
-	return true, mt, message, clientID
-}
-
-func (s *server) checkClientIsConnected(clientID uint32) bool {
-	s.Lock()
-	defer s.Unlock()
-	if _, ok := s.connectedClients[clientID]; ok {
-		return true
-	}
-	s.connectedClients[clientID] = struct{}{}
-	return false
-}
-
-func (s *server) disconnectClient(clientID uint32) {
-	s.Lock()
-	defer s.Unlock()
-	delete(s.connectedClients, clientID)
+	return serverWS
 }
