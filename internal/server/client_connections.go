@@ -7,7 +7,7 @@ import (
 )
 
 // filterConnection filters initiated connection and returns true if everything
-// is ok returns true, otherwise returns false and closes connection with a client.
+// is ok, otherwise returns false and closes the connection with a client.
 func (s *server) filterConnection(clientWS *websocket.Conn, clientID uint32) bool {
 	if s.checkClientIsConnected(clientID) {
 		log.Printf("client %d is already connected", clientID)
