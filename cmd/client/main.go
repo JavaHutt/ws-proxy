@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -26,7 +27,7 @@ func main() {
 	log.SetFlags(0)
 
 	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
 
 	u := url.URL{Scheme: "ws", Host: *addr, Path: "/"}
 	log.Printf("connecting to %s", u.String())
@@ -67,10 +68,16 @@ func startFakingOrders(c *websocket.Conn, done chan struct{}, interrupt chan os.
 			return
 		case <-ticker.C:
 			req := proxy.OrderRequest{
-				ClientID:   clientID,
-				ID:         id,
-				ReqType:    uint8(rand.Uint32()),
-				OrderKind:  uint8(rand.Uint32()),
+				ClientID: clientID,
+				ID:       id,
+				// I suggest using my variation of faking data, because there is almost no chance
+				// you'll get a valid request type and order kind at the same time.
+				// before:
+				// ReqType:    uint8(rand.Uint32()),
+				// OrderKind:  uint8(rand.Uint32()),
+				// after:
+				ReqType:    getRandomReqType(),
+				OrderKind:  getRandomReqType(),
 				Volume:     100 * seededRand.Float64(),
 				Instrument: *instrument,
 			}
@@ -100,4 +107,8 @@ func startFakingOrders(c *websocket.Conn, done chan struct{}, interrupt chan os.
 			return
 		}
 	}
+}
+
+func getRandomReqType() uint8 {
+	return uint8(rand.Intn(2-1+1) + 1)
 }
