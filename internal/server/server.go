@@ -22,6 +22,11 @@ type Server interface {
 
 type orderAdapter interface {
 	TranslateOrder(order proxy.OrderRequest) (model.OrderRequest, error)
+	GetResultCodeFromErr(err error) model.ResultCode
+}
+
+type ordersService interface {
+	ProcessOrder(order model.OrderRequest) error
 }
 
 // Server represents an HTTP server.
@@ -30,17 +35,19 @@ type server struct {
 	addr             string
 	backendAddr      string
 	adapter          orderAdapter
+	svc              ordersService
 	connectedClients map[uint32]struct{}
 	serv             *http.Server
 	upgrader         websocket.Upgrader
 	dialer           *websocket.Dialer
 }
 
-func NewServer(addr, backendAddr string, orderAdapter orderAdapter) Server {
+func NewServer(addr, backendAddr string, orderAdapter orderAdapter, ordersService ordersService) Server {
 	return &server{
 		addr:             addr,
 		backendAddr:      backendAddr,
 		adapter:          orderAdapter,
+		svc:              ordersService,
 		connectedClients: make(map[uint32]struct{}),
 		upgrader:         websocket.Upgrader{},
 		dialer:           websocket.DefaultDialer,
@@ -88,19 +95,11 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverWS := s.mustGetServerConn()
-	_, err = s.adapter.TranslateOrder(req)
-	if err != nil {
-		// the task description didn't specify the way to respond to invalid
-		// requests, so I've decided to send back "Other" result code
-		writeOtherErrorToClient(clientWS, req.ID, err)
-	} else {
-		// first-time write to server after establishing connection with client
-		writeToConn(serverWS, "server", mt, message)
-	}
+	// firstProcess runs once when connection had been established
+	s.firstProcess(clientWS, serverWS, req, mt, message)
 
-	done := make(chan struct{})
 	// start listening from server and repeat message directly to client
-	go s.serverToClient(serverWS, clientWS, done)
+	go s.serverToClient(serverWS, clientWS)
 	// process client message and pass it to server if everything is ok
 	s.clientToServer(clientWS, serverWS, clientID)
 }
@@ -115,26 +114,27 @@ func (s *server) clientToServer(clientWS, serverWS *websocket.Conn, clientID uin
 		}
 		req := proxy.DecodeOrderRequest(message)
 		log.Printf("recv from client: %v", req)
+		id := req.ID
 
-		_, err = s.adapter.TranslateOrder(req)
+		translatedOrder, err := s.adapter.TranslateOrder(req)
 		if err != nil {
-			writeOtherErrorToClient(clientWS, req.ID, err)
+			s.writeErrorToClient(clientWS, id, err)
+			continue
+		}
+		if err := s.svc.ProcessOrder(translatedOrder); err != nil {
+			s.writeErrorToClient(clientWS, id, err)
 			continue
 		}
 
-		res := proxy.OrderResponse{
-			ID:   req.ID,
-			Code: 0,
-		}
 		if err = writeToConn(serverWS, "server", mt, message); err != nil {
 			continue
 		}
 
-		log.Printf("sent to server: %v", res)
+		log.Printf("sent to server: %v", req)
 	}
 }
 
-func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan struct{}) {
+func (s *server) serverToClient(serverWS, clientWS *websocket.Conn) {
 	defer serverWS.Close()
 	for {
 		mt, messsage, err := serverWS.ReadMessage()
@@ -142,12 +142,32 @@ func (s *server) serverToClient(serverWS, clientWS *websocket.Conn, done chan st
 			log.Printf("recv error: %+v", err)
 			return
 		}
-		decoded := proxy.DecodeOrderResponse(messsage)
+		res := proxy.DecodeOrderResponse(messsage)
 
 		if err = writeToConn(clientWS, "client", mt, messsage); err != nil {
 			continue
 		}
 
-		log.Printf("recv from server and sent to client: %v", decoded)
+		log.Printf("recv from server and sent to client: %v", res)
+	}
+}
+
+func (s *server) firstProcess(
+	clientWS, serverWS *websocket.Conn,
+	req proxy.OrderRequest,
+	mt int,
+	message []byte,
+) {
+	id := req.ID
+	translatedOrder, err := s.adapter.TranslateOrder(req)
+	if err != nil {
+		// the task description didn't specify the way to respond to invalid
+		// requests, so I've decided to send back "Other" result code
+		s.writeErrorToClient(clientWS, id, err)
+	} else if err = s.svc.ProcessOrder(translatedOrder); err != nil {
+		s.writeErrorToClient(clientWS, id, err)
+	} else {
+		// first-time write to server after establishing connection with client
+		writeToConn(serverWS, "server", mt, message)
 	}
 }

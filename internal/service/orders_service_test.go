@@ -15,7 +15,7 @@ func TestProcessOrder(t *testing.T) {
 
 	cases := []struct {
 		name       string
-		service    *orderService
+		service    *ordersService
 		input      model.OrderRequest
 		wantCount  uint
 		wantVolume float64
@@ -23,7 +23,7 @@ func TestProcessOrder(t *testing.T) {
 	}{
 		{
 			name:    "invalid request type",
-			service: NewOrderService(1, 200),
+			service: NewOrdersService(1, 200),
 			input: model.OrderRequest{
 				ReqType: 4,
 			},
@@ -31,7 +31,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name:    "open order success",
-			service: NewOrderService(1, 200),
+			service: NewOrdersService(1, 200),
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
@@ -44,7 +44,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "increase volume and count",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -68,7 +68,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "instrument not exists on client",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -87,7 +87,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name:    "open order with restricted limit",
-			service: NewOrderService(0, 100),
+			service: NewOrdersService(0, 100),
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
@@ -97,7 +97,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "open order with number of orders exceedes",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 1000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -118,7 +118,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name:    "open order with restricted sum limit",
-			service: NewOrderService(10, 0),
+			service: NewOrdersService(10, 0),
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
@@ -129,7 +129,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "open order with sum of volumes exceedes",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 3000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -151,7 +151,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "close order success",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    5,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -175,7 +175,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "close order no client",
-			service: &orderService{
+			service: &ordersService{
 				clientsInstruments: map[uint32]map[string]*instrument{},
 			},
 			input: model.OrderRequest{
@@ -188,7 +188,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "close order no instrument",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -205,7 +205,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "close order zero orders",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    2,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{
@@ -225,7 +225,7 @@ func TestProcessOrder(t *testing.T) {
 		},
 		{
 			name: "close order negative volume sum",
-			service: &orderService{
+			service: &ordersService{
 				ordersLimit:    5,
 				volumeSumLimit: 4000,
 				clientsInstruments: map[uint32]map[string]*instrument{

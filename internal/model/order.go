@@ -17,7 +17,8 @@ const (
 type ResultCode uint16
 
 const (
-	ResultCodeOpenOrdersExceedes ResultCode = iota + 1
+	ResultCodeSuccess ResultCode = iota
+	ResultCodeOpenOrdersExceedes
 	ResultCodeVolumesExceedes
 	ResultCodeOther
 )

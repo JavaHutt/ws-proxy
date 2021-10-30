@@ -3,6 +3,8 @@ package service
 import (
 	"sync"
 
+	"log"
+
 	"test.task/backend/proxy/internal/model"
 )
 
@@ -11,17 +13,19 @@ type instrument struct {
 	volumeSum float64
 }
 
-type orderService struct {
+type ordersService struct {
 	// I've decided to use map + mutex instead of syncmap because there are
-	// gonna be constant key manipulations operations since it is client id
+	// gonna be constant key manipulations we can have many clients
 	sync.Mutex
 	ordersLimit        uint
 	volumeSumLimit     float64
 	clientsInstruments map[uint32]map[string]*instrument
 }
 
-func NewOrderService(ordersLimit uint, volumeSumLimit float64) *orderService {
-	return &orderService{
+func NewOrdersService(ordersLimit uint, volumeSumLimit float64) *ordersService {
+	log.Printf("orders service started. open orders limit: %d, sum of volumes limit: %f\n", ordersLimit, volumeSumLimit)
+
+	return &ordersService{
 		ordersLimit:        ordersLimit,
 		volumeSumLimit:     volumeSumLimit,
 		clientsInstruments: make(map[uint32]map[string]*instrument),
@@ -29,7 +33,7 @@ func NewOrderService(ordersLimit uint, volumeSumLimit float64) *orderService {
 }
 
 // ProcessOrder is an entry point in orders service
-func (svc *orderService) ProcessOrder(order model.OrderRequest) error {
+func (svc *ordersService) ProcessOrder(order model.OrderRequest) error {
 	switch order.ReqType {
 	case model.RequestTypeOpen:
 		return svc.openOrder(order)
@@ -40,7 +44,7 @@ func (svc *orderService) ProcessOrder(order model.OrderRequest) error {
 	}
 }
 
-func (svc *orderService) openOrder(order model.OrderRequest) error {
+func (svc *ordersService) openOrder(order model.OrderRequest) error {
 	if svc.ordersLimit == 0 {
 		return model.ErrNumberExceedes
 	}
@@ -81,7 +85,7 @@ func (svc *orderService) openOrder(order model.OrderRequest) error {
 	return nil
 }
 
-func (svc *orderService) closeOrder(order model.OrderRequest) error {
+func (svc *ordersService) closeOrder(order model.OrderRequest) error {
 	clientID, orderInstrument, volume := order.ClientID, order.Instrument, order.Volume
 
 	svc.Lock()
