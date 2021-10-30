@@ -26,12 +26,13 @@ lint	:
 test	:
 	CGO_ENABLED=1 go test -race -cover -count=1 -coverprofile=.coverprofile ./internal/...
 
+# Docker
 dockerfiles	:	
 	docker build -f ./docker/Dockerfile.proxy -t order-be-proxy .
 	docker build -f ./docker/Dockerfile.server -t order-be-server .
 
-dockerserver	:
-	docker run --network host -d -p 8081:8081 -it order-be-server
+up	:
+	docker-compose -f docker-compose.yaml up -d
 
-dockerproxy	:
-	docker run --network host -p 8080:8080 order-be-proxy
+down	:
+	docker-compose -f docker-compose.yaml down

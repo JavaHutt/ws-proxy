@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile.server
+    container_name: order-be-server
+    network_mode: "host"
+    ports:
+      - "8081:8081"
+
+  order-be-proxy:
+    depends_on:
+      - server
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile.proxy
+    container_name: order-be-proxy
+    network_mode: "host"
+    ports:
+     - "8080:8080"

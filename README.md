@@ -23,7 +23,7 @@ Task description is in [DESCRIPTION.md](DESCRIPTION.md)
 - :trophy: standard Go library (except for Gorilla Websocket package)
 - :arrow_right_hook: clean architecture (handler->service)
 - :book: standard Go project layout
-- :hammer: Dockerfiles & Makefile included
+- :hammer: Docker-compose, Dockerfiles & Makefile included
 - :toilet: tests with mocks included
 
 ## HOWTO
@@ -45,6 +45,14 @@ make client
 - test with
 ```bash
 make test
+```
+- start server with proxy in containers:
+```bash
+make up
+```
+- stop container:
+```bash
+make down
 ```
 
 ## A picture is worth a thousand words
