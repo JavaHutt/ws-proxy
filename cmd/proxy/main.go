@@ -24,6 +24,7 @@ func main() {
 	orderAdapter := adapter.NewOrderAdapter()
 	ordersService := service.NewOrdersService(*ordersLimit, *volumeSumLimit)
 	server := server.NewServer(*proxyAddr, *backendAddr, orderAdapter, ordersService)
+
 	errorChannel := make(chan error)
 	doneChannel := make(chan struct{})
 

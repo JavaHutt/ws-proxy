@@ -81,6 +81,9 @@ func (s *server) proxyHandler(w http.ResponseWriter, r *http.Request) {
 		log.Print("upgrade client request:", err)
 		return
 	}
+
+	// reading message first time not in a loop because firstly
+	// we need to get client id which is inside binary message
 	mt, message, err := clientWS.ReadMessage()
 	if err != nil {
 		return
@@ -164,10 +167,12 @@ func (s *server) firstProcess(
 		// the task description didn't specify the way to respond to invalid
 		// requests, so I've decided to send back "Other" result code
 		s.writeErrorToClient(clientWS, id, err)
-	} else if err = s.svc.ProcessOrder(translatedOrder); err != nil {
-		s.writeErrorToClient(clientWS, id, err)
-	} else {
-		// first-time write to server after establishing connection with client
-		writeToConn(serverWS, "server", mt, message)
+		return
 	}
+	if err = s.svc.ProcessOrder(translatedOrder); err != nil {
+		s.writeErrorToClient(clientWS, id, err)
+		return
+	}
+	// first-time write to server after establishing connection with client
+	writeToConn(serverWS, "server", mt, message)
 }

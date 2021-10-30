@@ -31,6 +31,7 @@ func (s *server) checkClientIsConnected(clientID uint32) bool {
 	if _, ok := s.connectedClients[clientID]; ok {
 		return true
 	}
+	// connecting new client
 	s.connectedClients[clientID] = struct{}{}
 	return false
 }

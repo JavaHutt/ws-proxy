@@ -3,6 +3,7 @@ package action
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,11 +25,11 @@ func GracefulShutdown(
 	}()
 
 	if err := <-errorChannel; err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		close(doneChannel)
 		httpServerShutdown(httpServer)
 
-		fmt.Println("app stopped", time.Now())
+		log.Println("app stopped", time.Now())
 	}
 	os.Exit(1)
 }
@@ -37,8 +38,8 @@ func httpServerShutdown(httpServer server.Server) {
 	ctx := context.Background()
 
 	if err := httpServer.Close(ctx); err != nil {
-		fmt.Printf("could not gracefully shutdown the server: %v\n", err)
+		log.Printf("could not gracefully shutdown the server: %v\n", err)
 	}
 
-	fmt.Println("http server stopped", time.Now())
+	log.Println("http server stopped", time.Now())
 }
