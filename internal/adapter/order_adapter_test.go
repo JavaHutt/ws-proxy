@@ -74,3 +74,33 @@ func TestTranslateOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestGetResultCodeFromErrr(t *testing.T) {
+	cases := []struct {
+		name  string
+		input error
+		want  model.ResultCode
+	}{
+		{
+			name:  "open order number exceedes",
+			input: model.ErrNumberExceedes,
+			want:  model.ResultCodeOpenOrdersExceedes,
+		},
+		{
+			name:  "instrument volume sum exceedes",
+			input: model.ErrVolumeSumExceedes,
+			want:  model.ResultCodeVolumesExceedes,
+		},
+		{
+			name:  "random error",
+			input: errors.New("random"),
+			want:  model.ResultCodeOther,
+		},
+	}
+	for _, tc := range cases {
+		got := mockAdapter.GetResultCodeFromErr(tc.input)
+		if got != tc.want {
+			t.Fatalf("%s failed: expected: %d, got: %d", tc.name, tc.want, got)
+		}
+	}
+}

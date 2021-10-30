@@ -27,6 +27,17 @@ func (orderAdapter) TranslateOrder(order proxy.OrderRequest) (model.OrderRequest
 	}, nil
 }
 
+func (orderAdapter) GetResultCodeFromErr(err error) model.ResultCode {
+	switch err {
+	case model.ErrNumberExceedes:
+		return model.ResultCodeOpenOrdersExceedes
+	case model.ErrVolumeSumExceedes:
+		return model.ResultCodeVolumesExceedes
+	default:
+		return model.ResultCodeOther
+	}
+}
+
 func validate(order proxy.OrderRequest) error {
 	reqType, orderKind := order.ReqType, order.OrderKind
 
