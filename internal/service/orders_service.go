@@ -17,14 +17,14 @@ type orderService struct {
 	sync.Mutex
 	ordersLimit        uint
 	volumeSumLimit     float64
-	clientsInstruments map[uint32]map[string]instrument
+	clientsInstruments map[uint32]map[string]*instrument
 }
 
 func NewOrderService(ordersLimit uint, volumeSumLimit float64) *orderService {
 	return &orderService{
 		ordersLimit:        ordersLimit,
 		volumeSumLimit:     volumeSumLimit,
-		clientsInstruments: make(map[uint32]map[string]instrument),
+		clientsInstruments: make(map[uint32]map[string]*instrument),
 	}
 }
 
@@ -41,8 +41,8 @@ func (svc *orderService) OpenOrder(order model.OrderRequest) error {
 	defer svc.Unlock()
 	instrumentMap, clientExists := svc.clientsInstruments[clientID]
 	if !clientExists {
-		svc.clientsInstruments[clientID] = make(map[string]instrument)
-		svc.clientsInstruments[clientID][orderInstrument] = instrument{
+		svc.clientsInstruments[clientID] = make(map[string]*instrument)
+		svc.clientsInstruments[clientID][orderInstrument] = &instrument{
 			count:     1,
 			volumeSum: volume,
 		}
@@ -50,7 +50,7 @@ func (svc *orderService) OpenOrder(order model.OrderRequest) error {
 	}
 	instr, instrumentExist := instrumentMap[orderInstrument]
 	if !instrumentExist {
-		instrumentMap[orderInstrument] = instrument{
+		instrumentMap[orderInstrument] = &instrument{
 			count:     1,
 			volumeSum: volume,
 		}
