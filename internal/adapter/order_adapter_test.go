@@ -8,7 +8,7 @@ import (
 	"test.task/backend/proxy/internal/model"
 )
 
-var mockAdapter = orderAdapter{}
+var mockAdapter = NewOrderAdapter()
 
 func TestTranslateOrder(t *testing.T) {
 	cases := []struct {

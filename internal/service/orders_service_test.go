@@ -58,6 +58,25 @@ func TestOpenOrder(t *testing.T) {
 			wantErr:    nil,
 		},
 		{
+			name: "instrument not exists on client",
+			service: &orderService{
+				ordersLimit:    2,
+				volumeSumLimit: 4000,
+				clientsInstruments: map[uint32]map[string]*instrument{
+					clientID: {},
+				},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeOpen,
+				Volume:     1000,
+				Instrument: instrumentName,
+			},
+			wantCount:  1,
+			wantVolume: 1000,
+			wantErr:    nil,
+		},
+		{
 			name:    "open order with restricted limit",
 			service: NewOrderService(0, 100),
 			input: model.OrderRequest{
