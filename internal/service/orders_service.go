@@ -28,8 +28,20 @@ func NewOrderService(ordersLimit uint, volumeSumLimit float64) *orderService {
 	}
 }
 
-func (svc *orderService) OpenOrder(order model.OrderRequest) error {
-	if svc.ordersLimit <= 0 {
+// ProcessOrder is an entry point in orders service
+func (svc *orderService) ProcessOrder(order model.OrderRequest) error {
+	switch order.ReqType {
+	case model.RequestTypeOpen:
+		return svc.openOrder(order)
+	case model.RequestTypeClose:
+		return svc.closeOrder(order)
+	default:
+		return model.ErrInvalidRequest
+	}
+}
+
+func (svc *orderService) openOrder(order model.OrderRequest) error {
+	if svc.ordersLimit == 0 {
 		return model.ErrNumberExceedes
 	}
 	clientID, orderInstrument, volume := order.ClientID, order.Instrument, order.Volume
@@ -69,6 +81,27 @@ func (svc *orderService) OpenOrder(order model.OrderRequest) error {
 	return nil
 }
 
-func (orderService) CloseOrder() {
+func (svc *orderService) closeOrder(order model.OrderRequest) error {
+	clientID, orderInstrument, volume := order.ClientID, order.Instrument, order.Volume
 
+	svc.Lock()
+	defer svc.Unlock()
+	instrumentMap, clientExists := svc.clientsInstruments[clientID]
+	if !clientExists {
+		return model.ErrNoOrderToClose
+	}
+	instr, instrumentExist := instrumentMap[orderInstrument]
+	if !instrumentExist {
+		return model.ErrNoOrderToClose
+	}
+	if instr.count == 0 {
+		return model.ErrNoOrderToClose
+	}
+	if instr.volumeSum-volume < 0 {
+		return model.ErrNegativeVolumeSum
+	}
+	instr.count--
+	instr.volumeSum -= volume
+
+	return nil
 }

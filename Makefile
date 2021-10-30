@@ -11,5 +11,5 @@ client	:
 lint	:
 	golangci-lint run ./cmd/... ./internal/...
 
-test        :
+test	:
 	CGO_ENABLED=1 go test -race -cover -count=1 -coverprofile=.coverprofile ./internal/...

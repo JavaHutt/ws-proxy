@@ -7,8 +7,9 @@ import (
 	"test.task/backend/proxy/internal/model"
 )
 
-func TestOpenOrder(t *testing.T) {
+func TestProcessOrder(t *testing.T) {
 	reqTypeOpen := model.RequestTypeOpen
+	reqTypeClose := model.RequestTypeClose
 	clientID := uint32(1)
 	instrumentName := "USDRUB"
 
@@ -20,6 +21,14 @@ func TestOpenOrder(t *testing.T) {
 		wantVolume float64
 		wantErr    error
 	}{
+		{
+			name:    "invalid request type",
+			service: NewOrderService(1, 200),
+			input: model.OrderRequest{
+				ReqType: 4,
+			},
+			wantErr: model.ErrInvalidRequest,
+		},
 		{
 			name:    "open order success",
 			service: NewOrderService(1, 200),
@@ -140,9 +149,105 @@ func TestOpenOrder(t *testing.T) {
 			},
 			wantErr: model.ErrVolumeSumExceedes,
 		},
+		{
+			name: "close order success",
+			service: &orderService{
+				ordersLimit:    5,
+				volumeSumLimit: 4000,
+				clientsInstruments: map[uint32]map[string]*instrument{
+					clientID: {
+						instrumentName: {
+							count:     3,
+							volumeSum: 2500,
+						},
+					},
+				},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeClose,
+				Volume:     100,
+				Instrument: instrumentName,
+			},
+			wantCount:  2,
+			wantVolume: 2400,
+			wantErr:    nil,
+		},
+		{
+			name: "close order no client",
+			service: &orderService{
+				clientsInstruments: map[uint32]map[string]*instrument{},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeClose,
+				Volume:     1000,
+				Instrument: instrumentName,
+			},
+			wantErr: model.ErrNoOrderToClose,
+		},
+		{
+			name: "close order no instrument",
+			service: &orderService{
+				ordersLimit:    2,
+				volumeSumLimit: 4000,
+				clientsInstruments: map[uint32]map[string]*instrument{
+					clientID: {},
+				},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeClose,
+				Volume:     1000,
+				Instrument: instrumentName,
+			},
+			wantErr: model.ErrNoOrderToClose,
+		},
+		{
+			name: "close order zero orders",
+			service: &orderService{
+				ordersLimit:    2,
+				volumeSumLimit: 4000,
+				clientsInstruments: map[uint32]map[string]*instrument{
+					clientID: {
+						instrumentName: {
+							count: 0,
+						},
+					},
+				},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeClose,
+				Instrument: instrumentName,
+			},
+			wantErr: model.ErrNoOrderToClose,
+		},
+		{
+			name: "close order negative volume sum",
+			service: &orderService{
+				ordersLimit:    5,
+				volumeSumLimit: 4000,
+				clientsInstruments: map[uint32]map[string]*instrument{
+					clientID: {
+						instrumentName: {
+							count:     3,
+							volumeSum: 300,
+						},
+					},
+				},
+			},
+			input: model.OrderRequest{
+				ClientID:   clientID,
+				ReqType:    reqTypeClose,
+				Instrument: instrumentName,
+				Volume:     400,
+			},
+			wantErr: model.ErrNegativeVolumeSum,
+		},
 	}
 	for _, tc := range cases {
-		err := tc.service.OpenOrder(tc.input)
+		err := tc.service.ProcessOrder(tc.input)
 		if err == nil {
 			instr := tc.service.clientsInstruments[clientID][instrumentName]
 			if instr.count != tc.wantCount {
