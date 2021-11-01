@@ -21,7 +21,7 @@ Task description is in [DESCRIPTION.md](DESCRIPTION.md)
 ## Solution notes
 
 - :trophy: standard Go library (except for Gorilla Websocket package)
-- :arrow_right_hook: clean architecture (handler->service)
+- :arrow_right_hook: clean architecture (server->handler->service)
 - :book: standard Go project layout
 - :hammer: Docker-compose, Dockerfiles & Makefile included
 - :toilet: tests with mocks included
