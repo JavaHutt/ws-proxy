@@ -1,4 +1,4 @@
-package http
+package handlers
 
 import (
 	"log"
@@ -8,8 +8,8 @@ import (
 
 // filterConnection filters initiated connection and returns true if everything
 // is ok, otherwise returns false and closes the connection with a client.
-func (s *server) filterConnection(clientWS *websocket.Conn, clientID uint32) bool {
-	if s.checkClientIsConnected(clientID) {
+func (p *ProxyHandler) filterConnection(clientWS *websocket.Conn, clientID uint32) bool {
+	if p.checkClientIsConnected(clientID) {
 		log.Printf("client %d is already connected", clientID)
 		if err := clientWS.WriteMessage(
 			websocket.CloseMessage,
@@ -25,19 +25,19 @@ func (s *server) filterConnection(clientWS *websocket.Conn, clientID uint32) boo
 	return true
 }
 
-func (s *server) checkClientIsConnected(clientID uint32) bool {
-	s.Lock()
-	defer s.Unlock()
-	if _, ok := s.connectedClients[clientID]; ok {
+func (p *ProxyHandler) checkClientIsConnected(clientID uint32) bool {
+	p.Lock()
+	defer p.Unlock()
+	if _, ok := p.connectedClients[clientID]; ok {
 		return true
 	}
 	// connecting new client
-	s.connectedClients[clientID] = struct{}{}
+	p.connectedClients[clientID] = struct{}{}
 	return false
 }
 
-func (s *server) disconnectClient(clientID uint32) {
-	s.Lock()
-	defer s.Unlock()
-	delete(s.connectedClients, clientID)
+func (p *ProxyHandler) disconnectClient(clientID uint32) {
+	p.Lock()
+	defer p.Unlock()
+	delete(p.connectedClients, clientID)
 }

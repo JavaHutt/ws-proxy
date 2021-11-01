@@ -1,4 +1,4 @@
-package http
+package handlers
 
 import (
 	"log"
@@ -8,21 +8,21 @@ import (
 	proxy "test.task/backend/proxy"
 )
 
-func (s *server) mustGetServerConn() *websocket.Conn {
-	u := url.URL{Scheme: "ws", Host: s.backendAddr, Path: "/connect"}
-	serverWS, _, err := s.dialer.Dial(u.String(), nil)
+func (p *ProxyHandler) mustGetServerConn() *websocket.Conn {
+	u := url.URL{Scheme: "ws", Host: p.backendAddr, Path: "/connect"}
+	serverWS, _, err := p.dialer.Dial(u.String(), nil)
 	if err != nil {
 		log.Fatal("dial to a server:", err)
 	}
 	return serverWS
 }
 
-func (s *server) writeErrorToClient(clientWS *websocket.Conn, ID uint32, originalErr error) {
+func (p *ProxyHandler) writeErrorToClient(clientWS *websocket.Conn, ID uint32, originalErr error) {
 	log.Printf("error ID %d: %v", ID, originalErr)
 
 	res := proxy.OrderResponse{
 		ID:   ID,
-		Code: uint16(s.adapter.GetResultCodeFromErr(originalErr)),
+		Code: uint16(p.adapter.GetResultCodeFromErr(originalErr)),
 	}
 	writeToConn(clientWS, "client", websocket.TextMessage, proxy.EncodeOrderResponse(res))
 }
