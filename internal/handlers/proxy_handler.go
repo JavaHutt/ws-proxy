@@ -19,21 +19,33 @@ type ordersService interface {
 	ProcessOrder(order model.OrderRequest) error
 }
 
+type clientsService interface {
+	TryConnectClient(clientID uint32) bool
+	DisconnectClient(clientID uint32)
+}
+
 type ProxyHandler struct {
 	sync.Mutex
 	backendAddr      string
 	adapter          orderAdapter
-	svc              ordersService
+	ordersSvc        ordersService
+	clientsSvc       clientsService
 	connectedClients map[uint32]struct{}
 	upgrader         websocket.Upgrader
 	dialer           *websocket.Dialer
 }
 
-func NewProxyHandler(backendAddr string, adapter orderAdapter, svc ordersService) *ProxyHandler {
+func NewProxyHandler(
+	backendAddr string,
+	adapter orderAdapter,
+	ordersSvc ordersService,
+	clientsSvc clientsService,
+) *ProxyHandler {
 	return &ProxyHandler{
 		backendAddr:      backendAddr,
 		adapter:          adapter,
-		svc:              svc,
+		ordersSvc:        ordersSvc,
+		clientsSvc:       clientsSvc,
 		connectedClients: make(map[uint32]struct{}),
 		upgrader:         websocket.Upgrader{},
 		dialer:           websocket.DefaultDialer,
@@ -77,7 +89,7 @@ func (p *ProxyHandler) clientToServer(clientWS, serverWS *websocket.Conn, client
 	for {
 		mt, message, err := clientWS.ReadMessage()
 		if err != nil {
-			p.disconnectClient(clientID)
+			p.clientsSvc.DisconnectClient(clientID)
 			break
 		}
 		req := proxy.DecodeOrderRequest(message)
@@ -89,7 +101,7 @@ func (p *ProxyHandler) clientToServer(clientWS, serverWS *websocket.Conn, client
 			p.writeErrorToClient(clientWS, id, err)
 			continue
 		}
-		if err := p.svc.ProcessOrder(translatedOrder); err != nil {
+		if err := p.ordersSvc.ProcessOrder(translatedOrder); err != nil {
 			p.writeErrorToClient(clientWS, id, err)
 			continue
 		}
@@ -134,7 +146,7 @@ func (p *ProxyHandler) firstProcess(
 		p.writeErrorToClient(clientWS, id, err)
 		return
 	}
-	if err = p.svc.ProcessOrder(translatedOrder); err != nil {
+	if err = p.ordersSvc.ProcessOrder(translatedOrder); err != nil {
 		p.writeErrorToClient(clientWS, id, err)
 		return
 	}

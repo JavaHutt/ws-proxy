@@ -9,7 +9,7 @@ import (
 // filterConnection filters initiated connection and returns true if everything
 // is ok, otherwise returns false and closes the connection with a client.
 func (p *ProxyHandler) filterConnection(clientWS *websocket.Conn, clientID uint32) bool {
-	if p.checkClientIsConnected(clientID) {
+	if !p.clientsSvc.TryConnectClient(clientID) {
 		log.Printf("client %d is already connected", clientID)
 		if err := clientWS.WriteMessage(
 			websocket.CloseMessage,
@@ -23,21 +23,4 @@ func (p *ProxyHandler) filterConnection(clientWS *websocket.Conn, clientID uint3
 		return false
 	}
 	return true
-}
-
-func (p *ProxyHandler) checkClientIsConnected(clientID uint32) bool {
-	p.Lock()
-	defer p.Unlock()
-	if _, ok := p.connectedClients[clientID]; ok {
-		return true
-	}
-	// connecting new client
-	p.connectedClients[clientID] = struct{}{}
-	return false
-}
-
-func (p *ProxyHandler) disconnectClient(clientID uint32) {
-	p.Lock()
-	defer p.Unlock()
-	delete(p.connectedClients, clientID)
 }

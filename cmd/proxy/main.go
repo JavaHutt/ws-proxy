@@ -24,7 +24,9 @@ func main() {
 
 	orderAdapter := adapter.NewOrderAdapter()
 	ordersService := service.NewOrdersService(*ordersLimit, *volumeSumLimit)
-	proxyHandler := handlers.NewProxyHandler(*backendAddr, orderAdapter, ordersService)
+	clientsService := service.NewClientsService()
+	proxyHandler := handlers.NewProxyHandler(*backendAddr, orderAdapter, ordersService, clientsService)
+
 	server := http.NewServer(*addr, proxyHandler)
 
 	errorChannel := make(chan error)
