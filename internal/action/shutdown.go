@@ -9,12 +9,12 @@ import (
 	"syscall"
 	"time"
 
-	"test.task/backend/proxy/internal/server"
+	"test.task/backend/proxy/internal/http"
 )
 
 func GracefulShutdown(
 	errorChannel chan error,
-	httpServer server.Server,
+	httpServer http.Server,
 	doneChannel chan struct{},
 ) {
 	// Capture interrupts.
@@ -34,7 +34,7 @@ func GracefulShutdown(
 	os.Exit(1)
 }
 
-func httpServerShutdown(httpServer server.Server) {
+func httpServerShutdown(httpServer http.Server) {
 	ctx := context.Background()
 
 	if err := httpServer.Close(ctx); err != nil {

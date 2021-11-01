@@ -6,7 +6,7 @@ import (
 
 	"test.task/backend/proxy/internal/action"
 	"test.task/backend/proxy/internal/adapter"
-	"test.task/backend/proxy/internal/server"
+	"test.task/backend/proxy/internal/http"
 	"test.task/backend/proxy/internal/service"
 )
 
@@ -23,7 +23,7 @@ func main() {
 
 	orderAdapter := adapter.NewOrderAdapter()
 	ordersService := service.NewOrdersService(*ordersLimit, *volumeSumLimit)
-	server := server.NewServer(*proxyAddr, *backendAddr, orderAdapter, ordersService)
+	server := http.NewServer(*proxyAddr, *backendAddr, orderAdapter, ordersService)
 
 	errorChannel := make(chan error)
 	doneChannel := make(chan struct{})

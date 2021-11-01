@@ -22,16 +22,23 @@ func TestProcessOrder(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name:    "invalid request type",
-			service: NewOrdersService(1, 200),
+			name: "invalid request type",
+			service: &ordersService{
+				ordersLimit:    1,
+				volumeSumLimit: 200,
+			},
 			input: model.OrderRequest{
 				ReqType: 4,
 			},
 			wantErr: model.ErrInvalidRequest,
 		},
 		{
-			name:    "open order success",
-			service: NewOrdersService(1, 200),
+			name: "open order success",
+			service: &ordersService{
+				ordersLimit:        1,
+				volumeSumLimit:     200,
+				clientsInstruments: make(map[uint32]map[string]*instrument),
+			},
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
@@ -86,8 +93,11 @@ func TestProcessOrder(t *testing.T) {
 			wantErr:    nil,
 		},
 		{
-			name:    "open order with restricted limit",
-			service: NewOrdersService(0, 100),
+			name: "open order with restricted limit",
+			service: &ordersService{
+				ordersLimit:    0,
+				volumeSumLimit: 100,
+			},
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
@@ -117,8 +127,11 @@ func TestProcessOrder(t *testing.T) {
 			wantErr:   model.ErrNumberExceedes,
 		},
 		{
-			name:    "open order with restricted sum limit",
-			service: NewOrdersService(10, 0),
+			name: "open order with restricted sum limit",
+			service: &ordersService{
+				ordersLimit:    10,
+				volumeSumLimit: 0,
+			},
 			input: model.OrderRequest{
 				ClientID:   clientID,
 				ReqType:    reqTypeOpen,
